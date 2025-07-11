@@ -41,7 +41,7 @@ export default function Home() {
             </div>
             <div>
               <h1 className="text-xl font-bold gradient-text">
-                M1 prog degany
+                Freecampcoding
               </h1>
               <p className="text-xs text-blue-200/70">
                 Résolution de Programmation Linéaire

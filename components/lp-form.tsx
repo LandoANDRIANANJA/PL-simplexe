@@ -36,25 +36,20 @@ type LPFormProps = {
 
 export function LPForm({ onSolve, selectedMethod }: LPFormProps) {
   const [numVariables, setNumVariables] = useState(2)
-  const [numConstraints, setNumConstraints] = useState(2)
+  const [numConstraints, setNumConstraints] = useState(4)
   const [operator, setOperator] = useState<string>("+");
-  const [constraintOperators, setConstraintOperators] = useState<string[]>(Array(numConstraints).fill("+"));
-
+  const [constraintOperators, setConstraintOperators] = useState<string[]>(Array(4).fill("+"));
   // Ajout des états pour les signes de chaque coefficient
-  const [objectiveSigns, setObjectiveSigns] = useState<string[]>(Array(numVariables).fill('+'));
-  const [constraintSigns, setConstraintSigns] = useState<string[][]>(Array(numConstraints).fill(null).map(() => Array(numVariables).fill('+')));
-
+  const [objectiveSigns, setObjectiveSigns] = useState<string[]>(Array(2).fill('+'));
+  const [constraintSigns, setConstraintSigns] = useState<string[][]>(Array(4).fill(null).map(() => Array(2).fill('+')));
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       problemType: 'max',
-      objectiveFunction: [3, 2],
-      constraintCoefficients: [
-        [2, 1],
-        [1, 2],
-      ],
-      constraintSigns: ['<=', '<='],
-      constraintValues: [10, 8],
+      objectiveFunction: Array(numVariables).fill(0),
+      constraintCoefficients: Array(numConstraints).fill(null).map(() => Array(numVariables).fill(0)),
+      constraintSigns: Array(numConstraints).fill('<='),
+      constraintValues: Array(numConstraints).fill(0),
     },
   })
 

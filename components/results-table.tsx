@@ -19,11 +19,33 @@ type TableData = {
 
 export function ResultsTable({ tableData, method, iterations, canonicalForm }: TableData) {
   const { headers, rows } = tableData
+  // Récupérer les messages pédagogiques si présents
+  const messages = (typeof tableData === 'object' && 'messages' in tableData && Array.isArray((tableData as any).messages)) ? (tableData as any).messages : [];
+  // Détecter si le problème a plus de 2 variables
+  const isThreeVarsOrMore = headers && headers.length > 5;
   
   // Pour la méthode simplexe, afficher la forme canonique et toutes les itérations
   if (method === 'simplex' && iterations && canonicalForm) {
     return (
       <div className="space-y-8">
+        {/* Message spécifique pour 3 variables ou plus */}
+        {isThreeVarsOrMore && (
+          <Card className="p-4 mb-4 bg-yellow-900/30 border border-yellow-400/30">
+            <h4 className="text-lg font-bold text-yellow-300 mb-2">ℹ️ Problème à 3 variables ou plus</h4>
+            <p className="text-yellow-200 text-sm">La visualisation graphique n'est pas disponible pour plus de 2 variables, mais l'algorithme du simplexe fonctionne parfaitement et toutes les étapes sont affichées ci-dessous.</p>
+          </Card>
+        )}
+        {/* Messages pédagogiques */}
+        {messages && messages.length > 0 && (
+          <Card className="p-4 mb-4 bg-blue-900/30 border border-blue-400/30">
+            <h4 className="text-lg font-bold text-blue-300 mb-2">🧑‍🏫 Explications pédagogiques</h4>
+            <ul className="list-disc ml-6 space-y-1">
+              {messages.map((msg: string, i: number) => (
+                <li key={i} className={msg.startsWith('✅') ? 'text-green-400' : msg.startsWith('❌') ? 'text-red-400' : 'text-blue-200'}>{msg}</li>
+              ))}
+            </ul>
+          </Card>
+        )}
         {/* Forme Canonique */}
         <Card className="modern-card p-6">
           <div className="flex items-center space-x-3 mb-4">
@@ -94,7 +116,7 @@ export function ResultsTable({ tableData, method, iterations, canonicalForm }: T
                 <div className="flex items-center space-x-3">
                   <div className="w-3 h-3 bg-gradient-to-r from-blue-400 to-cyan-300 rounded-full"></div>
                   <h3 className="text-xl font-bold gradient-text">
-                    {index === 0 ? 'Tableau Initial du Simplexe' : `Itération ${iteration.iteration}`}
+                    {index === 0 ? 'Tableau Initial du Simplexe' : `Itération ${iteration.iteration}`} <span className="ml-2 text-sm text-blue-300">[Phase {iteration.phase}]</span>
                   </h3>
                 </div>
                 {iteration.isOptimal && (
@@ -177,17 +199,17 @@ export function ResultsTable({ tableData, method, iterations, canonicalForm }: T
                                 : 'text-white bg-blue-900/10'
                             }`}
                           >
-                            {cell.toFixed(2)}
+                            {typeof cell === 'number' && isFinite(cell) ? cell.toFixed(2) : (cell ?? '-')}
                           </TableCell>
                         ))}
                         <TableCell className="text-center text-white font-mono bg-blue-900/10 border-r border-blue-500/20">
-                          {row[row.length - 1].toFixed(2)}
+                          {typeof row[row.length - 1] === 'number' && isFinite(row[row.length - 1]) ? row[row.length - 1].toFixed(2) : (row[row.length - 1] ?? '-')}
                         </TableCell>
                         {iteration.ratios && (
                           <TableCell className="text-center text-orange-300 font-mono bg-orange-900/10">
                             {iteration.ratios[rowIndex] === Infinity ? '∞' : 
                              iteration.ratios[rowIndex] < 0 ? '-' :
-                             iteration.ratios[rowIndex].toFixed(2)}
+                             (typeof iteration.ratios[rowIndex] === 'number' && isFinite(iteration.ratios[rowIndex]) ? iteration.ratios[rowIndex].toFixed(2) : '-')}
                           </TableCell>
                         )}
                       </TableRow>
@@ -201,11 +223,11 @@ export function ResultsTable({ tableData, method, iterations, canonicalForm }: T
                       <TableCell className="text-center border-r border-blue-500/20"></TableCell>
                       {iteration.cjRow.slice(0, -1).map((cell, cellIndex) => (
                         <TableCell key={cellIndex} className="text-center text-green-300 font-mono border-r border-blue-500/20">
-                          {cell.toFixed(0)}
+                          {typeof cell === 'number' && isFinite(cell) ? cell.toFixed(0) : (cell ?? '-')}
                         </TableCell>
                       ))}
                       <TableCell className="text-center text-green-300 font-mono border-r border-blue-500/20">
-                        {iteration.cjRow[iteration.cjRow.length - 1].toFixed(0)}
+                        {typeof iteration.cjRow[iteration.cjRow.length - 1] === 'number' && isFinite(iteration.cjRow[iteration.cjRow.length - 1]) ? iteration.cjRow[iteration.cjRow.length - 1].toFixed(0) : (iteration.cjRow[iteration.cjRow.length - 1] ?? '-')}
                       </TableCell>
                       {iteration.ratios && (
                         <TableCell className="text-center border-r border-blue-500/20"></TableCell>
@@ -225,11 +247,11 @@ export function ResultsTable({ tableData, method, iterations, canonicalForm }: T
                             cell > 0 ? 'text-red-300 font-bold' : 'text-purple-300'
                           }`}
                         >
-                          {cell.toFixed(2)}
+                          {typeof cell === 'number' && isFinite(cell) ? cell.toFixed(2) : (cell ?? '-')}
                         </TableCell>
                       ))}
                       <TableCell className="text-center text-purple-300 font-mono border-r border-blue-500/20">
-                        Z = {(-iteration.deltaJRow[iteration.deltaJRow.length - 1]).toFixed(2)}
+                        Z = {typeof iteration.deltaJRow[iteration.deltaJRow.length - 1] === 'number' && isFinite(iteration.deltaJRow[iteration.deltaJRow.length - 1]) ? (-iteration.deltaJRow[iteration.deltaJRow.length - 1]).toFixed(2) : '-'}
                       </TableCell>
                       {iteration.ratios && (
                         <TableCell className="text-center border-r border-blue-500/20"></TableCell>
@@ -268,7 +290,7 @@ export function ResultsTable({ tableData, method, iterations, canonicalForm }: T
                       <ul className="space-y-1">
                         {iteration.basis.map((varName, i) => (
                           <li key={i} className="text-sm font-mono text-white">
-                            {varName} = {iteration.tableau[i][iteration.tableau[i].length - 1].toFixed(3)}
+                            {varName} = {typeof iteration.tableau[i][iteration.tableau[i].length - 1] === 'number' && isFinite(iteration.tableau[i][iteration.tableau[i].length - 1]) ? iteration.tableau[i][iteration.tableau[i].length - 1].toFixed(3) : (iteration.tableau[i][iteration.tableau[i].length - 1] ?? '-')}
                           </li>
                         ))}
                       </ul>

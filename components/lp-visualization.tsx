@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 import { Card } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import type { SolutionMethod } from '@/app/page'
+import { solve3x3 } from '@/lib/utils';
 
 const Plot = dynamic(() => import('react-plotly.js'), { ssr: false }) as any
 
@@ -71,17 +72,108 @@ export function LPVisualization({ constraints, objectiveFunction, problemType, s
             }
           }
         }
-        return {
-          type: 'surface',
-          x: x,
-          y: y,
-          z: z,
-          opacity: 0.4,
-          showscale: false,
-          name: `${a}x₁ + ${b}x₂ + ${c}x₃ = ${d}`,
-          colorscale: [[0, ['#e74c3c', '#2980b9', '#8e44ad', '#f39c12', '#16a085', '#34495e'][i % 6]], [1, ['#e74c3c', '#2980b9', '#8e44ad', '#f39c12', '#16a085', '#34495e'][i % 6]]]
+        // Position du texte (au centre du plan dans la box)
+        const textPos = [10, 10, (Math.abs(c) > 1e-8 ? (d - a*10 - b*10)/c : 10)];
+        return [
+          {
+            type: 'surface',
+            x: x,
+            y: y,
+            z: z,
+            opacity: 0.4,
+            showscale: false,
+            name: `${a}x₁ + ${b}x₂ + ${c}x₃ = ${d}`,
+            colorscale: [[0, ['#e74c3c', '#2980b9', '#8e44ad', '#f39c12', '#16a085', '#34495e'][i % 6]], [1, ['#e74c3c', '#2980b9', '#8e44ad', '#f39c12', '#16a085', '#34495e'][i % 6]]]
+          },
+          {
+            type: 'scatter3d',
+            mode: 'text',
+            x: [textPos[0]],
+            y: [textPos[1]],
+            z: [textPos[2]],
+            text: [`${a}x₁ + ${b}x₂ + ${c}x₃ = ${d}`],
+            textfont: { color: ['#e74c3c', '#2980b9', '#8e44ad', '#f39c12', '#16a085', '#34495e'][i % 6], size: 14 },
+            showlegend: false,
+            hoverinfo: 'skip'
+          }
+        ];
+      }).flat();
+      // Calcul des sommets du polyèdre réalisable
+      const n = constraints.coefficients.length;
+      const vertices: number[][] = [];
+      for (let i = 0; i < n; i++) {
+        for (let j = i+1; j < n; j++) {
+          for (let k = j+1; k < n; k++) {
+            const A = [constraints.coefficients[i], constraints.coefficients[j], constraints.coefficients[k]];
+            const b = [constraints.values[i], constraints.values[j], constraints.values[k]];
+            const pt = solve3x3(A, b);
+            if (!pt) continue;
+            // Vérifier que le point satisfait toutes les contraintes (inégalités)
+            let feasible = true;
+            for (let cIdx = 0; cIdx < n; cIdx++) {
+              const [a, b_, c_] = constraints.coefficients[cIdx];
+              const sign = constraints.signs[cIdx];
+              const val = a*pt[0] + b_*pt[1] + c_*pt[2];
+              const rhs = constraints.values[cIdx];
+              if (sign === '<=' && val > rhs + 1e-6) feasible = false;
+              if (sign === '>=' && val < rhs - 1e-6) feasible = false;
+              if (sign === '=' && Math.abs(val - rhs) > 1e-6) feasible = false;
+            }
+            // Vérifier x, y, z >= 0
+            if (pt[0] < -1e-6 || pt[1] < -1e-6 || pt[2] < -1e-6) feasible = false;
+            if (feasible) {
+              // Arrondir pour éviter les doublons numériques
+              const rounded = pt.map(x => Math.round(x * 1e8) / 1e8);
+              if (!vertices.some(v => v.every((x, idx) => Math.abs(x - rounded[idx]) < 1e-6))) {
+                vertices.push(rounded);
+              }
+            }
+          }
         }
-      })
+      }
+      // Tracer les sommets
+      const verticesTrace = vertices.length > 0 ? {
+        x: vertices.map(v => v[0]),
+        y: vertices.map(v => v[1]),
+        z: vertices.map(v => v[2]),
+        mode: 'markers+text',
+        type: 'scatter3d',
+        marker: { size: 5, color: 'black' },
+        text: vertices.map(v => `(${v[0].toFixed(1)}, ${v[1].toFixed(1)}, ${v[2].toFixed(1)})`),
+        textposition: 'top right',
+        name: 'Sommets',
+        showlegend: true
+      } : null;
+      // Tracer le polyèdre réalisable (mesh3d)
+      let meshTrace = null;
+      if (vertices.length >= 4) {
+        // On relie tous les sommets (convex hull)
+        // Pour simplifier, on relie tous les triplets de sommets qui forment une face (naïf)
+        // (Pour un vrai convex hull, utiliser quickhull-3d ou scipy.spatial.ConvexHull)
+        // Ici, on relie tous les triplets qui sont sur une même face (tous les triplets)
+        const I: number[] = [];
+        const J: number[] = [];
+        const K: number[] = [];
+        for (let i = 0; i < vertices.length; i++) {
+          for (let j = i+1; j < vertices.length; j++) {
+            for (let k = j+1; k < vertices.length; k++) {
+              I.push(i); J.push(j); K.push(k);
+            }
+          }
+        }
+        meshTrace = {
+          type: 'mesh3d',
+          x: vertices.map(v => v[0]),
+          y: vertices.map(v => v[1]),
+          z: vertices.map(v => v[2]),
+          i: I, j: J, k: K,
+          opacity: 0.15,
+          color: 'red',
+          name: 'Polyèdre réalisable',
+          hoverinfo: 'skip',
+          showlegend: true
+        };
+      }
       // Point solution optimale
       let solution3D = null
       if (solution.isValid && solution.coordinates.length === 3) {
@@ -99,15 +191,17 @@ export function LPVisualization({ constraints, objectiveFunction, problemType, s
         }
       }
       setPlotData([
+        ...(meshTrace ? [meshTrace] : []),
         ...constraintPlanes,
+        ...(verticesTrace ? [verticesTrace] : []),
         ...(solution3D ? [solution3D] : [])
       ])
       setPlotLayout({
         title: 'Visualisation 3D (3 variables)',
         scene: {
-          xaxis: { title: 'x₁', range: xRange },
-          yaxis: { title: 'x₂', range: yRange },
-          zaxis: { title: 'x₃', range: zRange }
+          xaxis: { title: 'x₁', range: xRange, backgroundcolor: '#f8f8ff', gridcolor: '#bbb', zerolinecolor: '#888' },
+          yaxis: { title: 'x₂', range: yRange, backgroundcolor: '#f8f8ff', gridcolor: '#bbb', zerolinecolor: '#888' },
+          zaxis: { title: 'x₃', range: zRange, backgroundcolor: '#f8f8ff', gridcolor: '#bbb', zerolinecolor: '#888' }
         },
         autosize: true,
         legend: { x: 0, y: 1 }
@@ -433,6 +527,9 @@ export function LPVisualization({ constraints, objectiveFunction, problemType, s
     setPlotLayout(layout)
   }, [constraints, objectiveFunction, problemType, solution])
 
+  // Vérifier si la solution est réalisable et ne contient pas de NaN
+  const isSolutionValid = solution.isValid && solution.coordinates.every(x => typeof x === 'number' && !isNaN(x) && isFinite(x));
+
   return (
     <Card className="modern-card p-6">
       <div className="flex items-center space-x-3 mb-4">
@@ -443,54 +540,62 @@ export function LPVisualization({ constraints, objectiveFunction, problemType, s
         </h2>
       </div>
       <Separator className="my-4" />
-      
-      {objectiveFunction && objectiveFunction.length > 2 ? (
-        <div className="w-full h-[500px]">
-          {plotData.length > 0 && (
-            <Plot
-              data={plotData}
-              layout={plotLayout}
-              style={{ width: '100%', height: '100%' }}
-              useResizeHandler={true}
-              config={{ responsive: true, displayModeBar: false }}
-            />
-          )}
+
+      {!isSolutionValid ? (
+        <div className="w-full h-[300px] flex items-center justify-center">
+          <div className="text-red-500 text-lg font-semibold">Aucune solution réalisable trouvée pour ce problème.</div>
         </div>
       ) : (
-        <div className="w-full h-[500px]">
-          {plotData.length > 0 && (
-            <Plot
-              data={plotData}
-              layout={plotLayout}
-              style={{ width: '100%', height: '100%' }}
-              useResizeHandler={true}
-              config={{ responsive: true, displayModeBar: false }}
-            />
+        <>
+          {objectiveFunction && objectiveFunction.length > 2 ? (
+            <div className="w-full h-[500px]">
+              {plotData.length > 0 && (
+                <Plot
+                  data={plotData}
+                  layout={plotLayout}
+                  style={{ width: '100%', height: '100%' }}
+                  useResizeHandler={true}
+                  config={{ responsive: true, displayModeBar: false }}
+                />
+              )}
+            </div>
+          ) : (
+            <div className="w-full h-[500px]">
+              {plotData.length > 0 && (
+                <Plot
+                  data={plotData}
+                  layout={plotLayout}
+                  style={{ width: '100%', height: '100%' }}
+                  useResizeHandler={true}
+                  config={{ responsive: true, displayModeBar: false }}
+                />
+              )}
+            </div>
           )}
-        </div>
-      )}
-      
-      {solution.isValid && (
-        <div className="mt-6 p-4 glass-effect rounded-xl border border-green-500/20">
-          <h3 className="text-lg font-semibold mb-3 text-green-400">📊 Résumé de la Solution</h3>
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-blue-200/70 mb-1">Valeur Optimale :</p>
-              <p className="text-xl font-bold text-green-400">Z = {solution.value.toFixed(3)}</p>
+
+          {solution.isValid && (
+            <div className="mt-6 p-4 glass-effect rounded-xl border border-green-500/20">
+              <h3 className="text-lg font-semibold mb-3 text-green-400">📊 Résumé de la Solution</h3>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-blue-200/70 mb-1">Valeur Optimale :</p>
+                  <p className="text-xl font-bold text-green-400">Z = {solution.value.toFixed(3)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-blue-200/70 mb-1">Point Optimal :</p>
+                  <p className="text-lg font-mono text-white">(
+                {solution.coordinates.map((coord, i) => (
+                  <span key={i}>
+                    x<sub>{i+1}</sub> = {coord.toFixed(2)}
+                    {i < solution.coordinates.length - 1 ? ', ' : ''}
+                  </span>
+                ))}
+                  )</p>
+                </div>
+              </div>
             </div>
-            <div>
-              <p className="text-sm text-blue-200/70 mb-1">Point Optimal :</p>
-              <p className="text-lg font-mono text-white">(
-            {solution.coordinates.map((coord, i) => (
-              <span key={i}>
-                x<sub>{i+1}</sub> = {coord.toFixed(2)}
-                {i < solution.coordinates.length - 1 ? ', ' : ''}
-              </span>
-            ))}
-              )</p>
-            </div>
-          </div>
-        </div>
+          )}
+        </>
       )}
     </Card>
   )

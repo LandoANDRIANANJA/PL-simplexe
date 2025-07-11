@@ -24,6 +24,7 @@ export type SimplexIteration = {
   cjRow: number[]
   deltaJRow: number[]
   variableNames: string[]
+  phase: number // <-- Ajout pour la phase de l'itération
 }
 
 export type CanonicalForm = {
@@ -46,6 +47,7 @@ export type LPSolution = {
   iterations?: SimplexIteration[]
   canonicalForm?: CanonicalForm
   feasibleRegion?: number[][] // <-- ajout pour la visualisation graphique
+  messages?: string[] // <-- Ajout pour les messages pédagogiques
 }
 
 function convertToCanonicalForm(
@@ -165,6 +167,8 @@ function simplexMethod(
   constraintValues: number[],
   isMaximization: boolean
 ): LPSolution {
+  const EPS = 1e-8;
+  const messages: string[] = [];
   // Étape 1: Conversion en forme canonique
   const canonicalForm = convertToCanonicalForm(
     objectiveFunction,
@@ -174,39 +178,131 @@ function simplexMethod(
     isMaximization
   );
 
-  const iterations: SimplexIteration[] = [];
-  const { objectiveFunction: extendedObjective, constraintMatrix, rightHandSide, variableNames, basisVariables } = canonicalForm;
-  
+  let { objectiveFunction: extendedObjective, constraintMatrix, rightHandSide, variableNames, basisVariables } = canonicalForm;
   const m = constraintMatrix.length;
   const n = variableNames.length;
-  
-  // Créer le tableau initial du simplexe
+
+  // --- PHASE 1 : Si variables artificielles, minimiser leur somme ---
+  const artificialIndexes = variableNames
+    .map((name, idx) => name.startsWith('a') ? idx : -1)
+    .filter(idx => idx !== -1);
+  let phase1 = false;
+  let phase1Objective: number[] = [];
+  let phase1Iterations: SimplexIteration[] = [];
+  let phase1ArtificialValues: number[] = [];
+  if (artificialIndexes.length > 0) {
+    phase1 = true;
+    messages.push("Phase 1 : Minimisation de la somme des variables artificielles.");
+    // Fonction objectif auxiliaire : somme des variables artificielles
+    phase1Objective = Array(variableNames.length).fill(0);
+    artificialIndexes.forEach(idx => { phase1Objective[idx] = 1; });
+    // Lancer le simplexe sur cette fonction objectif
+    const phase1Result = runSimplex(constraintMatrix, rightHandSide, phase1Objective, variableNames, basisVariables, m, n, true, 1);
+    phase1Iterations = phase1Result.iterations;
+    // Vérifier la valeur optimale de la phase 1
+    const sumArtificial = phase1Result.solutionObj;
+    phase1ArtificialValues = artificialIndexes.map(idx => phase1Result.solution[idx]);
+    messages.push(`Somme des variables artificielles à la fin de la phase 1 : ${sumArtificial.toFixed(6)}`);
+    messages.push(`Valeurs des variables artificielles : [${phase1ArtificialValues.map(v => v.toFixed(6)).join(', ')}]`);
+    if (Math.abs(sumArtificial) > EPS) {
+      messages.push("❌ Problème irréalisable : la somme des variables artificielles n'est pas nulle à la fin de la phase 1.");
+      return {
+        isValid: false,
+        coordinates: [],
+        value: 0,
+        tableData: { headers: [], rows: [] },
+        iterations: phase1Iterations,
+        canonicalForm,
+        messages
+      };
+    }
+    // Retirer les variables artificielles de la base et des matrices
+    // (On garde seulement les variables originales et d'écart/excès)
+    const keepIndexes = variableNames.map((name, idx) => name.startsWith('a') ? -1 : idx).filter(idx => idx !== -1);
+    variableNames = keepIndexes.map(idx => variableNames[idx]);
+    extendedObjective = keepIndexes.map(idx => extendedObjective[idx]);
+    constraintMatrix = constraintMatrix.map(row => keepIndexes.map(idx => row[idx]));
+    // Mettre à jour la base : remplacer toute variable artificielle dans la base par une variable non-artificielle si possible
+    basisVariables = basisVariables.map(b => b.startsWith('a') ? (variableNames.find(v => !v.startsWith('a')) || b) : b);
+    messages.push("✅ Phase 1 terminée : base réalisable trouvée, passage à la phase 2.");
+  }
+
+  // --- PHASE 2 : Optimisation réelle ---
+  messages.push("Phase 2 : Optimisation de la fonction objectif réelle.");
+  const phase2Result = runSimplex(constraintMatrix, rightHandSide, extendedObjective, variableNames, basisVariables, m, variableNames.length, false, 2);
+  // Fusionner les itérations des deux phases pour l'affichage
+  const allIterations = [...(phase1 ? phase1Iterations : []), ...phase2Result.iterations];
+  // Gestion des cas limites
+  if (phase2Result.status === 'unbounded') {
+    messages.push("❌ Problème non borné : aucune variable ne peut sortir de la base lors d'un pivot.");
+    return {
+      isValid: false,
+      coordinates: [],
+      value: 0,
+      tableData: { headers: [], rows: [] },
+      iterations: allIterations,
+      canonicalForm,
+      messages
+    };
+  }
+  if (phase2Result.status === 'max-iterations') {
+    messages.push("❌ Limite d'itérations atteinte : le problème est peut-être dégénéré ou cyclique.");
+    return {
+      isValid: false,
+      coordinates: [],
+      value: 0,
+      tableData: { headers: [], rows: [] },
+      iterations: allIterations,
+      canonicalForm,
+      messages
+    };
+  }
+  // Solution optimale trouvée
+  messages.push("✅ Solution optimale trouvée en phase 2.");
+  return {
+    isValid: true,
+    coordinates: phase2Result.solution.slice(0, objectiveFunction.length),
+    value: Math.abs(phase2Result.solutionObj),
+    tableData: { headers: [], rows: [] },
+    iterations: allIterations,
+    canonicalForm,
+    messages
+  };
+}
+
+// Fonction utilitaire : exécute le simplexe sur un problème donné (tableau, base, etc.)
+function runSimplex(
+  constraintMatrix: number[][],
+  rightHandSide: number[],
+  objective: number[],
+  variableNames: string[],
+  basisVariables: string[],
+  m: number,
+  n: number,
+  isPhase1: boolean,
+  phase: number
+): { solution: number[]; solutionObj: number; iterations: SimplexIteration[]; status?: string } {
+  const EPS = 1e-8;
   const tableau: number[][] = [];
-  
   // Ajouter les lignes de contraintes
   for (let i = 0; i < m; i++) {
     const row = [...constraintMatrix[i], rightHandSide[i]];
     tableau.push(row);
   }
-  
   // Ligne Cj (coefficients de la fonction objectif)
-  const cjRow = [...extendedObjective, 0];
+  const cjRow = [...objective, 0];
   tableau.push(cjRow);
-  
-  // Ligne Δj (initialement identique à Cj pour un problème de maximisation)
-  const deltaJRow = [...extendedObjective, 0];
+  // Ligne Δj (initialement identique à Cj)
+  const deltaJRow = [...objective, 0];
   tableau.push(deltaJRow);
-  
-  // Base initiale
   let basis = [...basisVariables];
   let basisCoefficients = basis.map(varName => {
     const index = variableNames.indexOf(varName);
-    return index >= 0 ? extendedObjective[index] : 0;
+    return index >= 0 ? objective[index] : 0;
   });
-  
   let iteration = 0;
   const maxIterations = 100;
-  
+  const iterations: SimplexIteration[] = [];
   // Stocker le tableau initial
   iterations.push({
     iteration: 0,
@@ -218,37 +314,32 @@ function simplexMethod(
     objectiveValue: 0,
     cjRow: [...cjRow],
     deltaJRow: [...deltaJRow],
-    variableNames: [...variableNames]
+    variableNames: [...variableNames],
+    phase
   });
-  
   while (iteration < maxIterations) {
     // Vérifier la condition d'optimalité
     const deltaJRowIndex = tableau.length - 1;
     let enteringCol = -1;
     let maxPositive = 0;
-    
-    // Trouver la variable entrante (plus grand Δj positif)
     for (let j = 0; j < tableau[deltaJRowIndex].length - 1; j++) {
-      if (tableau[deltaJRowIndex][j] > maxPositive) {
+      if (tableau[deltaJRowIndex][j] > maxPositive + EPS) {
         maxPositive = tableau[deltaJRowIndex][j];
         enteringCol = j;
       }
     }
-    
-    if (enteringCol === -1 || maxPositive <= 1e-10) {
+    if (enteringCol === -1 || maxPositive <= EPS) {
       // Solution optimale trouvée
       iterations[iterations.length - 1].isOptimal = true;
       iterations[iterations.length - 1].objectiveValue = -tableau[tableau.length - 1][tableau[0].length - 1];
       break;
     }
-    
     // Test du rapport minimum pour trouver la variable sortante
     let leavingRow = -1;
     let minRatio = Infinity;
     const ratios: number[] = [];
-    
     for (let i = 0; i < m; i++) {
-      if (tableau[i][enteringCol] > 1e-10) {
+      if (tableau[i][enteringCol] > EPS) {
         const ratio = tableau[i][tableau[i].length - 1] / tableau[i][enteringCol];
         ratios.push(ratio);
         if (ratio >= 0 && ratio < minRatio) {
@@ -259,22 +350,17 @@ function simplexMethod(
         ratios.push(tableau[i][tableau[i].length - 1] >= 0 ? Infinity : -1);
       }
     }
-    
     if (leavingRow === -1) {
-      // Solution non bornée
+      // Problème non borné
       return {
-        isValid: false,
-        coordinates: [],
-        value: 0,
-        tableData: { headers: [], rows: [] },
+        solution: Array(n).fill(0),
+        solutionObj: 0,
         iterations,
-        canonicalForm
+        status: 'unbounded'
       };
     }
-    
     const enteringVariable = variableNames[enteringCol];
     const leavingVariable = basis[leavingRow];
-    
     // Stocker l'itération avec les informations de pivot
     iterations.push({
       iteration: iteration + 1,
@@ -289,18 +375,14 @@ function simplexMethod(
       objectiveValue: -tableau[tableau.length - 1][tableau[0].length - 1],
       cjRow: [...tableau[tableau.length - 2]],
       deltaJRow: [...tableau[tableau.length - 1]],
-      variableNames: [...variableNames]
+      variableNames: [...variableNames],
+      phase
     });
-    
     // Opérations de pivot
     const pivot = tableau[leavingRow][enteringCol];
-    
-    // F1: Diviser la ligne pivot par l'élément pivot
     for (let j = 0; j < tableau[leavingRow].length; j++) {
       tableau[leavingRow][j] /= pivot;
     }
-    
-    // F2: Éliminer les autres lignes
     for (let i = 0; i < tableau.length; i++) {
       if (i !== leavingRow) {
         const factor = tableau[i][enteringCol];
@@ -309,46 +391,33 @@ function simplexMethod(
         }
       }
     }
-    
     // Mettre à jour la base
     basis[leavingRow] = enteringVariable;
-    basisCoefficients[leavingRow] = extendedObjective[enteringCol];
-    
+    basisCoefficients[leavingRow] = objective[enteringCol];
     iteration++;
   }
-  
   if (iteration >= maxIterations) {
     return {
-      isValid: false,
-      coordinates: [],
-      value: 0,
-      tableData: { headers: [], rows: [] },
+      solution: Array(n).fill(0),
+      solutionObj: 0,
       iterations,
-      canonicalForm
+      status: 'max-iterations'
     };
   }
-  
   // Extraire la solution finale
-  const solution = Array(objectiveFunction.length).fill(0);
+  const solution = Array(n).fill(0);
   for (let i = 0; i < m; i++) {
     const varName = basis[i];
     const varIndex = variableNames.indexOf(varName);
-    if (varIndex < objectiveFunction.length) {
+    if (varIndex < n) {
       solution[varIndex] = tableau[i][tableau[i].length - 1];
     }
   }
-  
-  const finalValue = isMaximization ? 
-    -tableau[tableau.length - 1][tableau[0].length - 1] : 
-    tableau[tableau.length - 1][tableau[0].length - 1];
-  
+  const finalValue = -tableau[tableau.length - 1][tableau[0].length - 1];
   return {
-    isValid: true,
-    coordinates: solution,
-    value: Math.abs(finalValue),
-    tableData: { headers: [], rows: [] },
-    iterations,
-    canonicalForm
+    solution,
+    solutionObj: finalValue,
+    iterations
   };
 }
 
