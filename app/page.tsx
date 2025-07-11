@@ -21,7 +21,13 @@ export default function Home() {
   const handleSolve = (formData: LPProblem) => {
     setProblem(formData)
     const result = solveLPProblem(formData, selectedMethod)
-    setSolution(result)
+    // Si méthode simplexe et problème à 2 variables, on récupère aussi la région réalisable
+    if (selectedMethod === 'simplex' && formData.objectiveFunction.length === 2) {
+      const graphical = solveLPProblem(formData, 'graphical')
+      setSolution({ ...result, feasibleRegion: graphical.feasibleRegion })
+    } else {
+      setSolution(result)
+    }
   }
   
   return (
@@ -112,17 +118,25 @@ export default function Home() {
                   
                   <TabsContent value="visualization" className="mt-6">
                     {problem && solution && (
-                      <LPVisualization
-                        constraints={{
-                          coefficients: problem.constraintCoefficients,
-                          signs: problem.constraintSigns,
-                          values: problem.constraintValues
-                        }}
-                        objectiveFunction={problem.objectiveFunction}
-                        problemType={problem.problemType}
-                        solution={solution}
-                        method={selectedMethod}
-                      />
+                      problem.objectiveFunction.length === 2 ? (
+                        <LPVisualization
+                          constraints={{
+                            coefficients: problem.constraintCoefficients,
+                            signs: problem.constraintSigns,
+                            values: problem.constraintValues
+                          }}
+                          objectiveFunction={problem.objectiveFunction}
+                          problemType={problem.problemType}
+                          solution={solution}
+                          method={selectedMethod}
+                        />
+                      ) : (
+                        <div className="p-4 glass-effect rounded-xl border border-yellow-500/20">
+                          <p className="text-yellow-300">
+                            ⚠️ La visualisation graphique n'est disponible que pour les problèmes à 2 variables.
+                          </p>
+                        </div>
+                      )
                     )}
                   </TabsContent>
                   

@@ -45,6 +45,7 @@ export type LPSolution = {
   }
   iterations?: SimplexIteration[]
   canonicalForm?: CanonicalForm
+  feasibleRegion?: number[][] // <-- ajout pour la visualisation graphique
 }
 
 function convertToCanonicalForm(
@@ -525,6 +526,19 @@ function graphicalMethod(
       tableData: { headers: [], rows: [] }
     };
   }
+  // Ordonner les sommets de la région réalisable pour affichage du polygone
+  function orderPolygonVertices(vertices: number[][]): number[][] {
+    // Calcul du centroïde
+    const cx = vertices.reduce((sum, v) => sum + v[0], 0) / vertices.length;
+    const cy = vertices.reduce((sum, v) => sum + v[1], 0) / vertices.length;
+    // Trier par angle autour du centroïde
+    return vertices.slice().sort((a, b) => {
+      const angleA = Math.atan2(a[1] - cy, a[0] - cx);
+      const angleB = Math.atan2(b[1] - cy, b[0] - cx);
+      return angleA - angleB;
+    });
+  }
+  const feasibleRegion = orderPolygonVertices(feasible);
   // Calculer la valeur de la fonction objectif pour chaque point réalisable
   const values = feasible.map(pt => objectiveFunction[0]*pt[0] + objectiveFunction[1]*pt[1]);
   let idx = 0;
@@ -542,7 +556,8 @@ function graphicalMethod(
     tableData: {
       headers: ["Contraintes", "Équations des droites", "Point 1", "Point 2", "Point 3"],
       rows: tableRows
-    }
+    },
+    feasibleRegion // <-- ajout pour la visualisation
   };
 }
 
