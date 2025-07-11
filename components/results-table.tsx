@@ -52,7 +52,7 @@ export function ResultsTable({ tableData, method, iterations, canonicalForm }: T
                         </TableHead>
                       ))}
                       <TableHead className="text-center font-bold text-green-300 bg-green-900/20">
-                        RHS
+                        A0
                       </TableHead>
                     </TableRow>
                   </TableHeader>
@@ -139,7 +139,7 @@ export function ResultsTable({ tableData, method, iterations, canonicalForm }: T
                         Ci
                       </TableHead>
                       <TableHead className="text-center font-bold text-blue-300 bg-blue-900/20 border-r border-blue-500/30">
-                        Base
+                        i
                       </TableHead>
                       {iteration.variableNames.map((varName, i) => (
                         <TableHead key={i} className="text-center font-bold text-blue-300 bg-blue-900/20 border-r border-blue-500/30">
@@ -147,7 +147,7 @@ export function ResultsTable({ tableData, method, iterations, canonicalForm }: T
                         </TableHead>
                       ))}
                       <TableHead className="text-center font-bold text-blue-300 bg-blue-900/20 border-r border-blue-500/30">
-                        RHS
+                        A0
                       </TableHead>
                       {iteration.ratios && (
                         <TableHead className="text-center font-bold text-orange-300 bg-orange-900/20">

@@ -41,6 +41,21 @@ export function LPVisualization({ constraints, objectiveFunction, problemType, s
     const xRange = [0, 20]
     const yRange = [0, 20]
     
+    // Filtrer les contraintes pour n'afficher que celles qui se coupent avec au moins une autre
+    const nonParallelIndices = new Set<number>();
+    const coeffs = constraints.coefficients;
+    for (let i = 0; i < coeffs.length; i++) {
+      for (let j = 0; j < coeffs.length; j++) {
+        if (i === j) continue;
+        const [a1, b1] = coeffs[i];
+        const [a2, b2] = coeffs[j];
+        // Deux droites sont parallèles si a1*b2 === a2*b1
+        if (a1 * b2 !== a2 * b1) {
+          nonParallelIndices.add(i);
+          nonParallelIndices.add(j);
+        }
+      }
+    }
     const constraintLines = constraints.coefficients.map((coeffs, i) => {
       const a = coeffs[0]
       const b = coeffs[1]
@@ -97,7 +112,7 @@ export function LPVisualization({ constraints, objectiveFunction, problemType, s
           width: 2
         }
       }
-    })
+    }).filter((_, i) => nonParallelIndices.has(i));
     
     const xAxisLine = {
       x: [0, xRange[1]],

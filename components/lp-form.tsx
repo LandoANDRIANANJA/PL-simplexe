@@ -252,7 +252,7 @@ export function LPForm({ onSolve, selectedMethod }: LPFormProps) {
 
           <Separator />
 
-          <div className="space-y-4 glass-effect rounded-xl p-6">
+          <div className="space-y-4 glass-effect rounded-xl p-3 md:p-6">
             <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold text-blue-300">Contraintes</h3>
               <div className="flex space-x-2">
@@ -283,7 +283,7 @@ export function LPForm({ onSolve, selectedMethod }: LPFormProps) {
 
             <div className="space-y-3">
               {Array.from({ length: numConstraints }).map((_, constraintIndex) => (
-                <div key={`constraint-${constraintIndex}`} className="flex items-center flex-wrap gap-2">
+                <div key={`constraint-${constraintIndex}`} className="flex flex-wrap gap-2 md:flex-row flex-col md:items-center">
                   {Array.from({ length: numVariables }).map((_, varIndex) => (
                     <div key={`constraint-${constraintIndex}-var-${varIndex}`} className="flex items-center">
                       <select
@@ -299,7 +299,7 @@ export function LPForm({ onSolve, selectedMethod }: LPFormProps) {
                         <option value="-">-</option>
                       </select>
                       <Input
-                        className="w-16 text-center bg-blue-900/50 border-blue-500/50 text-white"
+                        className="w-14 md:w-16 text-center bg-blue-900/50 border-blue-500/50 text-white"
                         type="number"
                         min={0}
                         {...form.register(`constraintCoefficients.${constraintIndex}.${varIndex}`, { 
@@ -334,7 +334,7 @@ export function LPForm({ onSolve, selectedMethod }: LPFormProps) {
                   </select>
                   
                   <Input
-                    className="w-16 text-center bg-blue-900/50 border-blue-500/50 text-white"
+                    className="w-14 md:w-16 text-center bg-blue-900/50 border-blue-500/50 text-white"
                     type="number"
                     min={0}
                     {...form.register(`constraintValues.${constraintIndex}`, { 

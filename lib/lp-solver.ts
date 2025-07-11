@@ -563,9 +563,9 @@ export const solveLPProblem = (problem: LPProblem, method: SolutionMethod = 'gra
     // Par défaut ou +, on garde les coefficients tels quels
 
     // Prise en compte des signes dans les contraintes
-    constraintCoefficients = constraintCoefficients.map((row, i) =>
+      constraintCoefficients = constraintCoefficients.map((row, i) =>
       constraintOperators![i] === '-' ? row.map((c, j) => j === 0 ? c : -Math.abs(c)) : row
-    );
+      );
 
     if (method === 'graphical' && objectiveFunction.length === 2) {
       return graphicalMethod(
