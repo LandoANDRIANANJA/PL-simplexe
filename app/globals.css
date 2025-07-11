@@ -1,0 +1,85 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 15, 23, 42;
+  --background-end-rgb: 30, 41, 59;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 15, 23, 42;
+    --background-end-rgb: 30, 41, 59;
+  }
+}
+
+@layer base {
+  :root {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 84% 4.9%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 94.1%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 text-foreground min-h-screen;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+}
+
+.glass-effect {
+  @apply bg-white/5 backdrop-blur-xl border border-white/10;
+}
+
+.gradient-text {
+  @apply bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent;
+}
+
+.modern-card {
+  @apply glass-effect rounded-2xl shadow-2xl shadow-blue-500/10;
+}
+
+.modern-button {
+  @apply bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 
+         text-white font-semibold py-3 px-6 rounded-xl shadow-lg shadow-blue-500/25 
+         transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/40 
+         hover:scale-105 active:scale-95;
+}
+
+.method-card {
+  @apply glass-effect rounded-xl p-6 border border-blue-500/20 hover:border-blue-400/40 
+         transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/20 cursor-pointer;
+}
+
+.method-card.selected {
+  @apply border-blue-400/60 bg-blue-500/10 shadow-lg shadow-blue-500/30;
+}
