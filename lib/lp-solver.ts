@@ -550,6 +550,12 @@ export const solveLPProblem = (problem: LPProblem, method: SolutionMethod = 'gra
   try {
     let { objectiveFunction, constraintCoefficients, constraintValues, constraintSigns, problemType, objectiveOperator, constraintOperators } = problem;
 
+    // Correction : initialiser constraintOperators si undefined
+    if (!constraintOperators) {
+      constraintOperators = Array(constraintCoefficients.length).fill('+');
+    }
+    constraintOperators = constraintOperators as string[];
+
     // Prise en compte du signe de la fonction objectif
     if (objectiveOperator === '-') {
       objectiveFunction = objectiveFunction.map((c, i) => i === 0 ? c : -Math.abs(c));
@@ -557,11 +563,9 @@ export const solveLPProblem = (problem: LPProblem, method: SolutionMethod = 'gra
     // Par défaut ou +, on garde les coefficients tels quels
 
     // Prise en compte des signes dans les contraintes
-    if (constraintOperators && constraintOperators.length === constraintCoefficients.length) {
-      constraintCoefficients = constraintCoefficients.map((row, i) =>
-        constraintOperators[i] === '-' ? row.map((c, j) => j === 0 ? c : -Math.abs(c)) : row
-      );
-    }
+    constraintCoefficients = constraintCoefficients.map((row, i) =>
+      constraintOperators![i] === '-' ? row.map((c, j) => j === 0 ? c : -Math.abs(c)) : row
+    );
 
     if (method === 'graphical' && objectiveFunction.length === 2) {
       return graphicalMethod(
