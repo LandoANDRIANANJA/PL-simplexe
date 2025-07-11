@@ -36,23 +36,24 @@ type LPFormProps = {
 
 export function LPForm({ onSolve, selectedMethod }: LPFormProps) {
   const [numVariables, setNumVariables] = useState(2)
-  const [numConstraints, setNumConstraints] = useState(4)
+  const [numConstraints, setNumConstraints] = useState(5)
   const [operator, setOperator] = useState<string>("+");
-  const [constraintOperators, setConstraintOperators] = useState<string[]>(Array(4).fill("+"));
+  const [constraintOperators, setConstraintOperators] = useState<string[]>(Array(5).fill("+"));
   // Ajout des états pour les signes de chaque coefficient
   const [objectiveSigns, setObjectiveSigns] = useState<string[]>(Array(2).fill('+'));
-  const [constraintSigns, setConstraintSigns] = useState<string[][]>(Array(4).fill(null).map(() => Array(2).fill('+')));
-  const defaultFormValues = {
+  const [constraintSigns, setConstraintSigns] = useState<string[][]>(Array(5).fill(null).map(() => Array(2).fill('+')));
+  const defaultFormValues: z.infer<typeof formSchema> = {
     problemType: 'max',
-    objectiveFunction: [5, 4],
+    objectiveFunction: [1, 1],
     constraintCoefficients: [
-      [0, 1],    // x₂ ≤ 1000
-      [4, -1],   // 4x₁ − x₂ = 1800
-      [-1, 6],   // −x₁ + 6x₂ ≥ 3000
-      [2, 3],    // 2x₁ + 3x₂ ≤ 4500
+      [2, -3],    // 2x1 - 3x2 <= 2
+      [2, 1],     // 2x1 + x2 <= 11
+      [-1, 1],    // -x1 + x2 <= 3
+      [1, 0],     // x1 <= 4
+      [0, 1],     // x2 <= 5
     ],
-    constraintSigns: ['<=', '=', '>=', '<='],
-    constraintValues: [1000, 1800, 3000, 4500],
+    constraintSigns: ['<=', '<=', '<=', '<=', '<='],
+    constraintValues: [2, 11, 3, 4, 5],
   };
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),

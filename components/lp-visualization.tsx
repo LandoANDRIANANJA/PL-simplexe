@@ -204,7 +204,7 @@ export function LPVisualization({ constraints, objectiveFunction, problemType, s
           zaxis: { title: 'x₃', range: zRange, backgroundcolor: '#f8f8ff', gridcolor: '#bbb', zerolinecolor: '#888' }
         },
         autosize: true,
-        legend: { x: 0, y: 1 }
+        legend: { x: 1, y: 1, xanchor: 'right', yanchor: 'top', traceorder: 'normal', font: { family: 'sans-serif', size: 10, color: '#000' }, bgcolor: 'rgba(255,255,255,0.7)', bordercolor: '#FFFFFF', borderwidth: 2 }
       })
       return
     }
@@ -317,8 +317,8 @@ export function LPVisualization({ constraints, objectiveFunction, problemType, s
         mode: 'lines',
         name: `${coeffs[0]}x₁ + ${coeffs[1]}x₂ ${constraints.signs[i]} ${constraints.values[i]}`,
         line: {
-          color: constraintColors[i % constraintColors.length],
-          width: 4,
+          color: isActive ? ['#FF5733', '#33FF57', '#3357FF', '#FFBD33', '#33FFBD'][i % 5] : 'gray',
+          width: 2,
           dash: isActive ? 'solid' : 'dashdot'
         }
       }
@@ -375,9 +375,9 @@ export function LPVisualization({ constraints, objectiveFunction, problemType, s
     // Générer des hachures croisées, colorées, qui ne dépassent pas la droite
     function getCustomHatchSegments(a: number, b: number, c: number, sign: string, angle: number, color: string, isGreen: boolean) {
       const segments = [];
-      const xStep = 0.2; // plus dense
-      const yStep = 0.2; // plus dense
-      const L = 1.5; // plus long
+      const xStep = 0.5;
+      const yStep = 0.5;
+      const L = 1.2;
       const offset = 0.6;
       const dx = Math.cos(angle) * L / 2;
       const dy = Math.sin(angle) * L / 2;
@@ -438,7 +438,7 @@ export function LPVisualization({ constraints, objectiveFunction, problemType, s
             x: seg.x,
             y: seg.y,
             mode: 'lines',
-            line: { color: seg.color, width: 3 }, // plus épais
+            line: { color: seg.color, width: 2 },
             showlegend: false,
             hoverinfo: 'skip',
             opacity: 0.7
@@ -486,7 +486,7 @@ export function LPVisualization({ constraints, objectiveFunction, problemType, s
         y: yPoly,
         mode: 'lines',
         fill: 'toself',
-        fillcolor: 'rgba(255,0,0,0.08)',
+        fillcolor: 'rgba(255,0,0,0.35)',
         line: { color: 'red', width: 3 },
         name: 'Zone Solution',
         showlegend: false,
@@ -494,14 +494,82 @@ export function LPVisualization({ constraints, objectiveFunction, problemType, s
       };
     }
     
+    // --- Tracé des droites à partir des points du tableau (pour chaque contrainte) ---
+    // Exemple de structure du tableau résultat (à adapter selon ton vrai tableau)
+    const tableauResultat = [
+      { points: [[0, 1000]] },                // 0x1 + 1x2 = 1000
+      { points: [[450, 0]] },                 // 4x1 - 1x2 = 1800
+      { points: [[0, 500]] },                 // -1x1 + 6x2 = 3000
+      { points: [[2250, 0], [0, 1500]] },     // 2x1 + 3x2 = 4500
+      { points: [[0, 0]] },                   // x1 = 0, x2 = 0
+    ];
+    // Génère le tableau des lignes à tracer à partir du tableau résultat
+    const tableauLinesFromPoints = tableauResultat.map((row, i) => {
+      if (!row.points || row.points.length < 2) return null;
+      const sorted = [...row.points].sort((a, b) => a[0] - b[0]);
+      return {
+        x: sorted.map(p => p[0]),
+        y: sorted.map(p => p[1]),
+        mode: 'lines+markers+text',
+        type: 'scatter',
+        marker: { color: 'red', size: 4 },
+        line: { color: 'red', width: 3 },
+        text: sorted.map(([x, y]) => `(${x},${y})`),
+        textposition: 'top right',
+        name: `Droite tableau`
+      };
+    }).filter(Boolean);
+
+    // Génère toutes les droites possibles entre chaque paire de points pour chaque contrainte
+    const tableauAllSegments = tableauResultat.flatMap((row, i) => {
+      if (!row.points || row.points.length < 2) return [];
+      const segments = [];
+      for (let j = 0; j < row.points.length; j++) {
+        for (let k = j + 1; k < row.points.length; k++) {
+          segments.push({
+            x: [row.points[j][0], row.points[k][0]],
+            y: [row.points[j][1], row.points[k][1]],
+            mode: 'lines+markers',
+            type: 'scatter',
+            marker: { color: 'orange', size: 6 },
+            line: { color: 'orange', width: 2, dash: 'dot' },
+            name: `Segment (${row.points[j][0]},${row.points[j][1]})-(${row.points[k][0]},${row.points[k][1]})`
+          });
+        }
+      }
+      return segments;
+    });
+    
+    // --- Tracé de la droite passant par le point optimal (même pente que la fonction objectif) ---
+    let optimalLine = null;
+    if (solution.isValid && solution.coordinates.length === 2) {
+      // Cette droite a la même pente que la fonction objectif et passe par S (point optimal)
+      const slope = -objectiveFunction[0] / objectiveFunction[1];
+      const x0 = solution.coordinates[0];
+      const y0 = solution.coordinates[1];
+      // On trace la droite sur tout le domaine
+      const xLine = [0, xRange[1]];
+      const yLine = [y0 + slope * (0 - x0), y0 + slope * (xRange[1] - x0)];
+      optimalLine = {
+        x: xLine,
+        y: yLine,
+        mode: 'lines',
+        line: { color: 'black', width: 3, dash: 'dash' },
+        name: 'Droite de la fonction objectif passant par S'
+      };
+    }
+    
     const data = [
       ...(feasibleRegionTrace ? [feasibleRegionTrace] : []),
       ...constraintLines,
+      ...tableauLinesFromPoints,
+      ...tableauAllSegments,
       ...hatchTraces,
       xAxisLine,
       yAxisLine,
       ...(solutionPoint ? [solutionPoint] : []),
       ...(solutionSTrace ? [solutionSTrace] : []),
+      ...(optimalLine ? [optimalLine] : []),
       objFuncLine
     ];
     
@@ -517,15 +585,17 @@ export function LPVisualization({ constraints, objectiveFunction, problemType, s
       },
       autosize: true,
       legend: {
-        x: 0,
+        x: 1,
         y: 1,
+        xanchor: 'right',
+        yanchor: 'top',
         traceorder: 'normal',
         font: {
           family: 'sans-serif',
           size: 10,
           color: '#000'
         },
-        bgcolor: '#E2E2E2',
+        bgcolor: 'rgba(255,255,255,0.7)',
         bordercolor: '#FFFFFF',
         borderwidth: 2
       }
