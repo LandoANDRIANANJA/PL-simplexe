@@ -42,15 +42,21 @@ export function LPForm({ onSolve, selectedMethod }: LPFormProps) {
   // Ajout des états pour les signes de chaque coefficient
   const [objectiveSigns, setObjectiveSigns] = useState<string[]>(Array(2).fill('+'));
   const [constraintSigns, setConstraintSigns] = useState<string[][]>(Array(4).fill(null).map(() => Array(2).fill('+')));
+  const defaultFormValues = {
+    problemType: 'max',
+    objectiveFunction: [5, 4],
+    constraintCoefficients: [
+      [0, 1],    // x₂ ≤ 1000
+      [4, -1],   // 4x₁ − x₂ = 1800
+      [-1, 6],   // −x₁ + 6x₂ ≥ 3000
+      [2, 3],    // 2x₁ + 3x₂ ≤ 4500
+    ],
+    constraintSigns: ['<=', '=', '>=', '<='],
+    constraintValues: [1000, 1800, 3000, 4500],
+  };
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      problemType: 'max',
-      objectiveFunction: Array(numVariables).fill(0),
-      constraintCoefficients: Array(numConstraints).fill(null).map(() => Array(numVariables).fill(0)),
-      constraintSigns: Array(numConstraints).fill('<='),
-      constraintValues: Array(numConstraints).fill(0),
-    },
+    defaultValues: defaultFormValues,
   })
 
   const addVariable = () => {

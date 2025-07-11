@@ -270,6 +270,7 @@ export function LPVisualization({ constraints, objectiveFunction, problemType, s
         }
       });
     }
+    const constraintColors = ['#e74c3c', '#27ae60', '#8e44ad', '#f39c12', '#16a085', '#34495e'];
     const constraintLines = constraints.coefficients.map((coeffs, i) => {
       const a = coeffs[0]
       const b = coeffs[1]
@@ -316,8 +317,8 @@ export function LPVisualization({ constraints, objectiveFunction, problemType, s
         mode: 'lines',
         name: `${coeffs[0]}x₁ + ${coeffs[1]}x₂ ${constraints.signs[i]} ${constraints.values[i]}`,
         line: {
-          color: isActive ? ['#FF5733', '#33FF57', '#3357FF', '#FFBD33', '#33FFBD'][i % 5] : 'gray',
-          width: 2,
+          color: constraintColors[i % constraintColors.length],
+          width: 4,
           dash: isActive ? 'solid' : 'dashdot'
         }
       }
@@ -374,9 +375,9 @@ export function LPVisualization({ constraints, objectiveFunction, problemType, s
     // Générer des hachures croisées, colorées, qui ne dépassent pas la droite
     function getCustomHatchSegments(a: number, b: number, c: number, sign: string, angle: number, color: string, isGreen: boolean) {
       const segments = [];
-      const xStep = 0.5;
-      const yStep = 0.5;
-      const L = 1.2;
+      const xStep = 0.2; // plus dense
+      const yStep = 0.2; // plus dense
+      const L = 1.5; // plus long
       const offset = 0.6;
       const dx = Math.cos(angle) * L / 2;
       const dy = Math.sin(angle) * L / 2;
@@ -437,7 +438,7 @@ export function LPVisualization({ constraints, objectiveFunction, problemType, s
             x: seg.x,
             y: seg.y,
             mode: 'lines',
-            line: { color: seg.color, width: 2 },
+            line: { color: seg.color, width: 3 }, // plus épais
             showlegend: false,
             hoverinfo: 'skip',
             opacity: 0.7
@@ -452,14 +453,21 @@ export function LPVisualization({ constraints, objectiveFunction, problemType, s
       solutionSTrace = {
         x: [solution.coordinates[0]],
         y: [solution.coordinates[1]],
-        mode: 'text',
+        mode: 'markers+text',
         type: 'scatter',
+        marker: {
+          color: 'red',
+          size: 22, // plus gros
+          symbol: 'circle',
+          line: { color: 'black', width: 2 }
+        },
         text: ['S'],
         textfont: {
           color: 'red',
-          size: 32,
+          size: 36, // plus gros
           family: 'Arial Black, Arial, sans-serif',
         },
+        textposition: 'top center',
         showlegend: false,
         hoverinfo: 'skip'
       };
